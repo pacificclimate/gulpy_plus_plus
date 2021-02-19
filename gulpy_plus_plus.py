@@ -1,27 +1,42 @@
+import glob
+from itertools import islice
 import logging
+from contextlib import contextmanager
 
+from dateutil.parser import parse as date_parse
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from pycds import Obs
-from crmprtd import insert
+from crmprtd.insert import insert
 
 logging.basicConfig(level="DEBUG")
 
-connection_string = "postgresql://hiebert@monsoon.pcic/crmp"
+def convert_line_to_pycds_obs(line):
+    history_id, date_time, datum, vars_id = line.split(',')
+    return Obs(time=date_parse(date_time), datum=datum, history_id=history_id, vars_id=vars_id)
 
-engine = create_engine(connection_string)
-sesh = Session(bind=engine)
+@contextmanager
+def transaction_to_rollback(connection_string):
+    engine = create_engine(connection_string)
+    connection = engine.connect()
+    transaction = connection.begin()
+    sesh = Session(bind=connection)
+    yield sesh
+    sesh.close
+    transaction.rollback()
+    connection.close()
 
-observations = (
-    Obs(time="2021-03-01", datum=0, history_id=1000000, vars_id=1000000),
-    Obs(time="2021-03-02", datum=0, history_id=1000000, vars_id=1000000),
-    Obs(time="2021-03-03", datum=0, history_id=1000000, vars_id=1000000),
-    Obs(time="2021-03-04", datum=0, history_id=1000000, vars_id=1000000),
-    Obs(time="2021-03-05", datum=0, history_id=1000000, vars_id=1000000),
-)
 
-results = insert(sesh, observations, 100)
+fname = glob.glob("/home/cdmb/PRISM/station_data_for_upload/ASP/*")[0]
 
-print(results)
+with open(fname) as f:
+    # Skip the header line
+    lines = [line for line in islice(f, 1, None)]
+    obs = [convert_line_to_pycds_obs(line) for line in lines]
 
+connection_string = "postgresql://hiebert@monsoon.pcic.uvic.ca/crmp"
+
+with transaction_to_rollback(connection_string) as sesh:
+    results = insert(sesh, obs, 100)
+    print(results)
