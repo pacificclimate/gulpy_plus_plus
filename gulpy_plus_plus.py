@@ -2,8 +2,8 @@ import glob
 from itertools import islice
 import logging
 from contextlib import contextmanager
+import csv
 
-from dateutil.parser import parse as date_parse
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -11,10 +11,6 @@ from pycds import Obs
 from crmprtd.insert import insert
 
 logging.basicConfig(level="DEBUG")
-
-def convert_line_to_pycds_obs(line):
-    history_id, date_time, datum, vars_id = line.split(',')
-    return Obs(time=date_parse(date_time), datum=datum, history_id=history_id, vars_id=vars_id)
 
 @contextmanager
 def transaction_to_rollback(connection_string):
@@ -28,12 +24,12 @@ def transaction_to_rollback(connection_string):
     connection.close()
 
 
-fname = glob.glob("/home/cdmb/PRISM/station_data_for_upload/ASP/*")[0]
+fname = glob.glob("/home/cdmb/PRISM/station_data_for_upload/ASP/*")[1]
 
-with open(fname) as f:
-    # Skip the header line
-    lines = [line for line in islice(f, 1, None)]
-    obs = [convert_line_to_pycds_obs(line) for line in lines]
+with open(fname) as csvfile:
+    fieldnames = ("history_id", "time", "datum", "vars_id")
+    reader = csv.DictReader(csvfile, fieldnames)
+    obs = [Obs(**row) for row in islice(reader, 1, None)]
 
 connection_string = "postgresql://hiebert@monsoon.pcic.uvic.ca/crmp"
 
