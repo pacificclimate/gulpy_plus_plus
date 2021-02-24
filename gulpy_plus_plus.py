@@ -1,4 +1,4 @@
-import glob
+import sys
 from itertools import islice
 import logging
 from contextlib import contextmanager
@@ -24,12 +24,11 @@ def transaction_to_rollback(connection_string):
     connection.close()
 
 
-fname = glob.glob("/home/cdmb/PRISM/station_data_for_upload/ASP/*")[1]
-
-with open(fname) as csvfile:
-    fieldnames = ("history_id", "time", "datum", "vars_id")
-    reader = csv.DictReader(csvfile, fieldnames)
-    obs = [Obs(**row) for row in islice(reader, 1, None)]
+for fname in sys.argv[1:]:
+    with open(fname) as csvfile:
+        fieldnames = ("history_id", "time", "datum", "vars_id")
+        reader = csv.DictReader(csvfile, fieldnames)
+        obs = [Obs(**row) for row in islice(reader, 1, None)]
 
 connection_string = "postgresql://hiebert@monsoon.pcic.uvic.ca/crmp"
 
