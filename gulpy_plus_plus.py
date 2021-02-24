@@ -3,6 +3,7 @@ from itertools import islice
 import logging
 from contextlib import contextmanager
 import csv
+from optparse import OptionParser
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -24,14 +25,20 @@ def transaction_to_rollback(connection_string):
     connection.close()
 
 
-for fname in sys.argv[1:]:
-    with open(fname) as csvfile:
-        fieldnames = ("history_id", "time", "datum", "vars_id")
-        reader = csv.DictReader(csvfile, fieldnames)
-        obs = [Obs(**row) for row in islice(reader, 1, None)]
+if __name__ == '__main__':
+    parser = OptionParser()
+    parser.add_option("-c", "--connection-string", dest="connection_string",
+                      help="database connection string",
+                      default="postgresql://crmp@monsoon.pcic.uvic.ca/crmp"
+                      )
+    (options, filenames) = parser.parse_args()
 
-connection_string = "postgresql://hiebert@monsoon.pcic.uvic.ca/crmp"
+    for fname in filenames:
+        with open(fname) as csvfile:
+            fieldnames = ("history_id", "time", "datum", "vars_id")
+            reader = csv.DictReader(csvfile, fieldnames)
+            obs = [Obs(**row) for row in islice(reader, 1, None)]
 
-with transaction_to_rollback(connection_string) as sesh:
-    results = insert(sesh, obs, 100)
-    print(results)
+        with transaction_to_rollback(options.connection_string) as sesh:
+            results = insert(sesh, obs, 100)
+            print(results)
