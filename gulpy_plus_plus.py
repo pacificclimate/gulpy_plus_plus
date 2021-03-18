@@ -21,7 +21,7 @@ def transaction_to_rollback(connection_string, diagnostic=True):
     transaction = connection.begin()
     sesh = Session(bind=connection)
     yield sesh
-    sesh.close
+    sesh.close()
     if diagnostic:
         transaction.rollback()
     else:
@@ -56,14 +56,14 @@ if __name__ == "__main__":
 
     (options, filenames) = parser.parse_args()
 
-    for fname in filenames:
-        with open(fname) as csvfile:
-            fieldnames = ("history_id", "time", "datum", "vars_id")
-            reader = csv.DictReader(csvfile, fieldnames)
-            obs = [Obs(**row) for row in islice(reader, 1, None)]
-
-        with transaction_to_rollback(
+    with transaction_to_rollback(
             options.connection_string, options.diagnostic
-        ) as sesh:
+    ) as sesh:
+        for fname in filenames:
+            with open(fname) as csvfile:
+                fieldnames = ("history_id", "time", "datum", "vars_id")
+                reader = csv.DictReader(csvfile, fieldnames)
+                obs = [Obs(**row) for row in islice(reader, 1, None)]
+
             results = insert(sesh, obs, options.sample_size)
             print(results)
